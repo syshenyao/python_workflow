@@ -8,4 +8,4 @@ from app import greet
 
 class TestGreet(unittest.TestCase):
     def test_greet(self):
-        self.assertEqual(greet("World123"), "Hello, World123!")
+        self.assertEqual(greet("World123456"), "Hello, World123456!")
