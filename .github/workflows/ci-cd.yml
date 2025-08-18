@@ -1,78 +1,44 @@
-name: Python CI/CD
+name: Docker Image CI/CD
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
+
 env:
   REGISTRY: docker.io
   IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/my-app
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests
-        run: |
-          pip install pytest
-          pytest tests/
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      # 1.构建Docker镜像并推送到Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 2. 设置构建参数
       - name: Setup buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3. 获取当前时间作为标签
-      - name: Get timestamp
-        id: timestamp
+      - name: Generate tags
+        id: tags
         run: |
-          echo "TIMESTAMP=$(date -u +'%Y-%m-%dT%H-%M-%SZ')" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           echo "DATE_TAG=$(date -u +'%Y%m%d')" >> $GITHUB_OUTPUT
+          echo "TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
 
-      # 4. 构建并推送镜像
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.ref == 'refs/heads/main' }}
+          push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.timestamp.outputs.DATE_TAG }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.timestamp.outputs.TIMESTAMP }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # 6. 输出镜像信息
-      - name: Show image info
-        run: |
-          echo "Image pushed to:"
-          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.timestamp.outputs.result }}"
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.SHORT_SHA }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.DATE_TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.TIMESTAMP }}
