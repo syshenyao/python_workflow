@@ -46,5 +46,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
+          file: ./Dockerfile  # 显式指定路径
           push: true
           tags: shenyao2025/my-app:latest
